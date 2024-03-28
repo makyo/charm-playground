@@ -89,10 +89,10 @@ func nextGeneration(m model) model {
 	return m
 }
 
-// generateField generates a random field of automata, where each cell has a 1 in 10 chance of being alive.
+// generateField generates a random field of automata, where each cell has a 1 in 5 chance of being alive.
 func generateField(m model) model {
 	for i, _ := range m.field {
-		if rand.Intn(10) == 0 {
+		if rand.Intn(5) == 0 {
 			m.field[i] = 1
 		}
 	}
