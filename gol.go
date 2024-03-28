@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"math"
 	"math/rand"
 	"time"
 
@@ -12,12 +14,22 @@ type model struct {
 	// Keep track of whether we have started in case we get a WindowSizeMsg and don't actually want to regenerate the field.
 	started bool
 
+	// Option to have the canvas be treated like a toroid by wrapping around.
+	wrap bool
+
 	// Maintain the field on which the automata live
 	width int
 	field []int
 }
 
 type tickMsg time.Time
+
+var wrapFlag = flag.Bool("wrap", false, "Wrap the grid at the edges, treating it like a toroid")
+
+// wrapPos wraps a cell position that would otherwise be outside of a rectangular grid.
+func (m model) wrapPos(pos int) int {
+	return int(math.Abs(float64(pos))) % len(m.field)
+}
 
 // nextGeneration evolves the field of automata one generation based on the rules of Conway's Game of Life.
 func nextGeneration(m model) model {
@@ -29,32 +41,32 @@ func nextGeneration(m model) model {
 		neighborCount := 0
 
 		// Count the adjacent living cells on the row above.
-		if i-m.width > 0 {
-			if i%m.width >= 0 {
-				neighborCount += m.field[i-m.width-1]
+		if i-m.width > 0 || m.wrap {
+			if i%m.width >= 0 || m.wrap {
+				neighborCount += m.field[m.wrapPos(i-m.width-1)]
 			}
-			neighborCount += m.field[i-m.width]
-			if (i+1)%m.width != 0 {
-				neighborCount += m.field[i-m.width+1]
+			neighborCount += m.field[m.wrapPos(i-m.width)]
+			if (i+1)%m.width != 0 || m.wrap {
+				neighborCount += m.field[m.wrapPos(i-m.width+1)]
 			}
 		}
 
 		// Count the adjacent cells to either side.
-		if i%m.width != 0 {
-			neighborCount += m.field[i-1]
+		if i%m.width != 0 || m.wrap {
+			neighborCount += m.field[m.wrapPos(i-1)]
 		}
-		if i < len(m.field)-1 && (i+1)%m.width != 0 {
-			neighborCount += m.field[i+1]
+		if (i < len(m.field)-1 && (i+1)%m.width != 0) || m.wrap {
+			neighborCount += m.field[m.wrapPos(i+1)]
 		}
 
 		// Count the adjacent cells on the row below.
-		if i+m.width < len(m.field) {
-			if i%m.width >= 0 {
-				neighborCount += m.field[i+m.width-1]
+		if i+m.width < len(m.field) || m.wrap {
+			if i%m.width >= 0 || m.wrap {
+				neighborCount += m.field[m.wrapPos(i+m.width-1)]
 			}
-			neighborCount += m.field[i+m.width]
-			if (i+1)%m.width != 0 {
-				neighborCount += m.field[i+m.width+1]
+			neighborCount += m.field[m.wrapPos(i+m.width)]
+			if (i+1)%m.width != 0 || m.wrap {
+				neighborCount += m.field[m.wrapPos(i+m.width+1)]
 			}
 		}
 
@@ -164,7 +176,10 @@ func (m model) View() string {
 }
 
 func main() {
-	p := tea.NewProgram(model{}, tea.WithAltScreen())
+	flag.Parse()
+	p := tea.NewProgram(model{
+		wrap: *wrapFlag,
+	}, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
