@@ -19,7 +19,7 @@ type model struct {
 
 	// Maintain the field on which the automata live
 	width int
-	field []int
+	field [][]int
 }
 
 type tickMsg time.Time
@@ -34,55 +34,67 @@ func (m model) wrapPos(pos int) int {
 // nextGeneration evolves the field of automata one generation based on the rules of Conway's Game of Life.
 func nextGeneration(m model) model {
 	// Create a new field based on the existing one.
-	next := make([]int, len(m.field))
+	next := make([][]int, len(m.field))
+	for i := 0; i < len(m.field); i++ {
+		next[i] = make([]int, len(m.field[0]))
+	}
 
-	// Loop over the cells.
-	for i, cell := range m.field {
-		neighborCount := 0
+	// Loop over rows...
+	for y, _ := range m.field {
 
-		// Count the adjacent living cells on the row above.
-		if i-m.width > 0 || m.wrap {
-			if i%m.width >= 0 || m.wrap {
-				neighborCount += m.field[m.wrapPos(i-m.width-1)]
+		// Loop over columns...
+		for x, _ := range m.field[y] {
+			neighborCount := 0
+
+			// Count the adjacent living cells on the row above.
+			if y-1 >= 0 {
+				if x-1 >= 0 {
+					neighborCount += m.field[y-1][x-1]
+				}
+				neighborCount += m.field[y-1][x]
+				if x+1 < len(m.field[y]) {
+					neighborCount += m.field[y-1][x+1]
+				}
 			}
-			neighborCount += m.field[m.wrapPos(i-m.width)]
-			if (i+1)%m.width != 0 || m.wrap {
-				neighborCount += m.field[m.wrapPos(i-m.width+1)]
-			}
-		}
 
-		// Count the adjacent cells to either side.
-		if i%m.width != 0 || m.wrap {
-			neighborCount += m.field[m.wrapPos(i-1)]
-		}
-		if (i < len(m.field)-1 && (i+1)%m.width != 0) || m.wrap {
-			neighborCount += m.field[m.wrapPos(i+1)]
-		}
-
-		// Count the adjacent cells on the row below.
-		if i+m.width < len(m.field) || m.wrap {
-			if i%m.width >= 0 || m.wrap {
-				neighborCount += m.field[m.wrapPos(i+m.width-1)]
+			// Count the adjacent cells to either side.
+			if x-1 >= 0 {
+				neighborCount += m.field[y][x-1]
 			}
-			neighborCount += m.field[m.wrapPos(i+m.width)]
-			if (i+1)%m.width != 0 || m.wrap {
-				neighborCount += m.field[m.wrapPos(i+m.width+1)]
+			if x+1 < len(m.field[y]) {
+				neighborCount += m.field[y][x+1]
 			}
-		}
 
-		// Evolve the current cell by the following rules:
-		//
-		// 1. A dead cell becomes live if it's surrounded by exactly three living cells to represent breeding.
-		// 2. A living cell dies of loneliness if it has 0 or 1 neighbors.
-		// 3. A living cell dies of overcrowding if it has more than 3 neighbors.
-		// 4. A living cell stays alive if it has 2 or 3 neighbors.
-		next[i] = cell
-		if cell == 0 && neighborCount == 3 {
-			next[i] = 1
-			continue
-		}
-		if cell == 1 && (neighborCount < 2 || neighborCount > 3) {
-			next[i] = 0
+			// Count the adjacent cells on the row below.
+			if y+1 < len(m.field) {
+				if x-1 >= 0 {
+					neighborCount += m.field[y+1][x-1]
+				}
+				neighborCount += m.field[y+1][x]
+				if x+1 < len(m.field[y]) {
+					neighborCount += m.field[y+1][x+1]
+				}
+			}
+
+			// Evolve the current cell by the following rules:
+			//
+			// 1. A dead cell becomes live if it's surrounded by exactly three living cells to represent breeding.
+			// 2. A living cell dies of loneliness if it has 0 or 1 neighbors.
+			// 3. A living cell dies of overcrowding if it has more than 3 neighbors.
+			// 4. A living cell stays alive if it has 2 or 3 neighbors.
+			if m.field[y][x] == 0 {
+				if neighborCount == 3 {
+					next[y][x] = 1
+				} else {
+					next[y][x] = 0
+				}
+			} else if m.field[y][x] == 1 {
+				if neighborCount < 2 || neighborCount > 3 {
+					next[y][x] = 0
+				} else {
+					next[y][x] = 1
+				}
+			}
 		}
 	}
 	m.field = next
@@ -91,9 +103,11 @@ func nextGeneration(m model) model {
 
 // generateField generates a random field of automata, where each cell has a 1 in 5 chance of being alive.
 func generateField(m model) model {
-	for i, _ := range m.field {
-		if rand.Intn(5) == 0 {
-			m.field[i] = 1
+	for y, _ := range m.field {
+		for x, _ := range m.field[y] {
+			if rand.Intn(5) == 0 {
+				m.field[y][x] = 1
+			}
 		}
 	}
 	return m
@@ -131,11 +145,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		if msg.Type == tea.MouseLeft {
-			pos := msg.Y*m.width + msg.X
-			if m.field[pos] == 1 {
-				m.field[pos] = 0
+			if m.field[msg.Y][msg.X] == 1 {
+				m.field[msg.Y][msg.X] = 0
 			} else {
-				m.field[pos] = 1
+				m.field[msg.Y][msg.X] = 1
 			}
 		}
 		return m, nil
@@ -144,8 +157,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 
 		// Reset the field to the correct size
-		m.field = make([]int, (msg.Width)*(msg.Height))
-		m.width = msg.Width
+		m.field = make([][]int, msg.Height)
+		for i := 0; i < msg.Height; i++ {
+			m.field[i] = make([]int, msg.Width)
+		}
 
 		// If it hasn't been started, generate the field.
 		// TODO: if it has, trim the existing field
@@ -172,17 +187,22 @@ func (m model) View() string {
 	var frame string
 
 	// Loop over rows...
-	for i, cell := range m.field {
-		if cell == 1 {
-			frame += "•"
-		} else {
-			frame += " "
-		}
-		if i > 0 && i%m.width == 0 {
-			frame += "\n"
-		}
-	}
+	for _, row := range m.field {
 
+		// Loop over collumns...
+		for _, col := range row {
+
+			// Set the cell contents
+			if col == 1 {
+				frame += "•"
+			} else {
+				frame += " "
+			}
+		}
+
+		// Newline at the end of every row.
+		frame += "\n"
+	}
 	return frame
 }
 
