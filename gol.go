@@ -89,10 +89,10 @@ func nextGeneration(m model) model {
 	return m
 }
 
-// generateField generates a random field of automata, where each cell has a 1 in 5 chance of being alive.
+// generateField generates a random field of automata, where each cell has a 1 in 10 chance of being alive.
 func generateField(m model) model {
 	for i, _ := range m.field {
-		if rand.Intn(5) == 0 {
+		if rand.Intn(10) == 0 {
 			m.field[i] = 1
 		}
 	}
@@ -117,17 +117,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Key press messages
 	case tea.KeyMsg:
-		switch msg.Type {
+		switch msg.String() {
 
 		// Quit on Escape or Ctrl+C
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
 
 		// Regenerate the field on Ctrl+R
-		case tea.KeyCtrlR:
+		case "ctrl+r":
 			m = generateField(m)
 			return m, nil
 		}
+
+	case tea.MouseMsg:
+		if msg.Type == tea.MouseLeft {
+			pos := msg.Y*m.width + msg.X
+			if m.field[pos] == 1 {
+				m.field[pos] = 0
+			} else {
+				m.field[pos] = 1
+			}
+		}
+		return m, nil
 
 	// Window size messages — we receive one initially, and then again on every resize
 	case tea.WindowSizeMsg:
@@ -179,7 +190,7 @@ func main() {
 	flag.Parse()
 	p := tea.NewProgram(model{
 		wrap: *wrapFlag,
-	}, tea.WithAltScreen())
+	}, tea.WithAltScreen(), tea.WithMouseAllMotion())
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
