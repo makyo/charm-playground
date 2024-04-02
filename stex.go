@@ -14,6 +14,7 @@ import (
 // TODO:
 // * https://github.com/lrstanley/bubblezone for mouse support on tabs and textareas
 // * Cursor blink
+// * Hanging indent
 
 type tickMsg time.Time
 
